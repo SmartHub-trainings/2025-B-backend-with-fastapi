@@ -42,6 +42,19 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email:EmailStr
     password:str
+
+def format_user(row):
+    return {
+        "id":row[0],
+        "email":row[1],
+        "first_name":row[2],
+        "last_name":row[3],
+        "phone_number":row[4],
+        "created_at":row[6],
+        "updated_at":row[7],
+        "role":row[8]
+    }
+    
     
 
 
@@ -54,7 +67,7 @@ def health_check():
     "timestamp":datetime.now()
     }
 
-@app.post("/auth/register")
+@app.post("/auth/register",tags=["Authentication"])
 def register(payload:UserCreate):
     # print(payload)
     conn = connect("kickets.db")
@@ -83,7 +96,7 @@ def register(payload:UserCreate):
         "data":payload
     }
 
-@app.post("/auth/login")
+@app.post("/auth/login",tags=["Authentication"])
 def login_user(payload:UserLogin):
     conn = connect("kickets.db")
     cur = conn.cursor()
@@ -96,7 +109,7 @@ def login_user(payload:UserLogin):
             "success":False,
             "statusCode":401
         }
-    is_password = password==user[5]
+    is_password = pwd_context.verify(password,user[5])
     if not is_password:
         return {
             "message":"Invalid credientails",
@@ -109,15 +122,25 @@ def login_user(payload:UserLogin):
         "message": "user login",
         "success":True,
         "statusCode":200,
-        "data":user
+        "data":format_user(user)
     }
-    
+
+
+def connect_db():
+    conn = connect("kickets.db")
+    cur = conn.cursor()
+    return conn,cur
 
 @app.get("/users")
 def get_all_users():
     conn = connect("kickets.db")
     cur = conn.cursor()
     data = cur.execute("SELECT * FROM users").fetchall()
+    users =[]
+    for row in data:
+        # print(row)
+        user=format_user(row)
+        users.append(user)
     return {"message": "all users",
-        "data":data
+        "data":users
     }
