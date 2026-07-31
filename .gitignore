@@ -8,3 +8,4 @@ day-1/any
 # day-4/.venv
 # day-5/.venv
 */.venv
+*/.env
