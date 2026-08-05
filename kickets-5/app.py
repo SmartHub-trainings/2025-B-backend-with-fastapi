@@ -70,9 +70,23 @@ pwd_context=CryptContext(schemes=["bcrypt"],
     deprecated="auto"
 )
 
+## seed an admin to the db
+def seed_admin():
+    db=SessionLocal()
+    user = User(
+            email="gbs@gmail.com",
+            first_name="Admin",
+            last_name="User",
+            phone_number="0123456789",
+            password=pwd_context.hash("password"),
+            role="admin"
+        )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    db.close()
 
-
-
+# seed_admin()
 
 
 class UserEmail(BaseModel):
@@ -208,26 +222,42 @@ def get_all_events(db:Session =Depends(get_db)):
     }
 
 @app.post("/events",tags=["Events"])
-def create_event_handler(body:EventCreate):
-    conn, cur = connect_db()
-    event_row=cur.execute("""insert into 
-    events(title,description, date,time, venue,user_id,category)
-    values(?,?,?,?,?,?,?) 
-    """,(body.title,body.description,body.date,body.time,body.venue,
-    body.user_id,body.category))
-    event =cur.execute("select * from events where event_id=?",
-    (event_row.lastrowid,)).fetchone()
-    if event:
-        cur.execute("update users set role ='host' where user_id =?",
-        (body.user_id,))
-        conn.commit()
+def create_event_handler(body:EventCreate,db:Session= Depends(get_db)):
 
-    
-    conn.close()
-    return {
-        "message": "Events retrieved successfully",
-        "success":True,
-        "statusCode":200,
-        "data":event
-    }
+    try:
+
+        event= Event(
+            title=body.title,
+            description=body.description,
+            date=datetime.strptime(body.date, "%Y-%m-%d").date(),
+            time=body.time,
+            venue=body.venue,
+            user_id=body.user_id,
+            category=body.category
+        )
+
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        if event:
+            query = select(User).where(User.user_id==body.user_id)
+            user = db.execute(query).scalar_one()
+            if user.role != "host":
+                user.role = "host"
+                db.commit()
+                db.refresh(user)
+
+        return {
+            "message": "Events created successfully",
+            "success":True,
+            "statusCode":200,
+            "data":event
+        }
+    except Exception as e:
+        print(e)
+        return {
+            "message": "Events retrieved failed",
+            "success":False,
+            "statusCode":400
+        }
 
